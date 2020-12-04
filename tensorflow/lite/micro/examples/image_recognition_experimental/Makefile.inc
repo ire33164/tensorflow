@@ -22,7 +22,8 @@ $(MAKEFILE_DIR)/downloads/image_recognition_model/image_recognition_model.cc
 IMAGE_RECOGNITION_TEST_HDRS := \
 tensorflow/lite/micro/examples/image_recognition_experimental/first_10_cifar_images.h \
 tensorflow/lite/micro/examples/image_recognition_experimental/image_recognition_model.h \
-tensorflow/lite/micro/examples/image_recognition_experimental/util.h
+tensorflow/lite/micro/examples/image_recognition_experimental/util.h \
+tensorflow/lite/simulate_NVM.h
 
 include $(wildcard tensorflow/lite/micro/examples/image_recognition_experimental/*/Makefile.inc)
 

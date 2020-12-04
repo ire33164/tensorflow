@@ -22,6 +22,7 @@ limitations under the License.
 #include "tensorflow/lite/micro/testing/micro_test.h"
 #include "tensorflow/lite/schema/schema_generated.h"
 #include "tensorflow/lite/version.h"
+#include "tensorflow/lite/simulate_nvm.h"
 
 #define IMAGE_BYTES 3072
 #define LABEL_BYTES 1
@@ -31,6 +32,8 @@ TF_LITE_MICRO_TESTS_BEGIN
 
 TF_LITE_MICRO_TEST(TestImageRecognitionInvoke) {
   tflite::MicroErrorReporter micro_error_reporter;
+
+  create_mmap();
 
   const tflite::Model* model = ::tflite::GetModel(image_recognition_model_data);
   if (model->version() != TFLITE_SCHEMA_VERSION) {
