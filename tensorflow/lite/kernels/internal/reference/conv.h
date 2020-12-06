@@ -17,8 +17,8 @@ limitations under the License.
 
 #include "tensorflow/lite/kernels/internal/types.h"
 #include "tensorflow/lite/kernels/internal/common.h"
+#include "tensorflow/lite/c/common.h"
 #include "tensorflow/lite/simulate_nvm.h"
-
 
 namespace tflite {
 
@@ -140,14 +140,37 @@ inline void Conv(const ConvParams& params, const RuntimeShape& input_shape,
   const int filter_width = filter_shape.Dims(2);
   const int output_height = output_shape.Dims(1);
   const int output_width = output_shape.Dims(2);
+  // const int input_length = input_height * input_width * input_depth;
+  // const int output_length = output_height * output_width * output_depth;
+
+  uint32_t version;
+  size_t node_idx;
+  version = intermittent_params[offset_nvm].version;
+  node_idx = intermittent_params[offset_nvm].node_idx;
   for (int batch = 0; batch < batches; ++batch) {
+    if (is_power_failure) batch = intermittent_params[offset_nvm].batch;
     for (int out_y = 0; out_y < output_height; ++out_y) {
+      if (is_power_failure) out_y = intermittent_params[offset_nvm].out_y;
       const int in_y_origin = (out_y * stride_height) - pad_height;
       for (int out_x = 0; out_x < output_width; ++out_x) {
+        if (is_power_failure) out_x = intermittent_params[offset_nvm].out_x;
         const int in_x_origin = (out_x * stride_width) - pad_width;
         for (int out_channel = 0; out_channel < output_depth; ++out_channel) {
+          if (is_power_failure) out_channel = intermittent_params[offset_nvm].out_channel, is_power_failure = false;
+          // Checkpoint forward progress infomation
+
+          intermittent_params[offset_nvm].node_idx = node_idx;
+          intermittent_params[offset_nvm].batch = batch;
+          intermittent_params[offset_nvm].out_y = out_y;
+          intermittent_params[offset_nvm].out_x = out_x;
+          intermittent_params[offset_nvm].out_channel = out_channel;
+          intermittent_params[offset_nvm].version = version;
+          write_to_nvm(&intermittent_params[offset_nvm], offset_nvm ? OFFSET : 0, sizeof(TfLiteIntermittentParams));
+          printf("version %d\n", version);
+          ++version;
+          offset_nvm = !offset_nvm;
+
           int32_t acc = 0;
-          /* Back up into NVM */
           for (int filter_y = 0; filter_y < filter_height; ++filter_y) {
             const int in_y = in_y_origin + dilation_height_factor * filter_y;
             for (int filter_x = 0; filter_x < filter_width; ++filter_x) {
@@ -186,6 +209,9 @@ inline void Conv(const ConvParams& params, const RuntimeShape& input_shape,
       }
     }
   }
+  printf("-----------------------------------------\n");
+  list_nvm();
+  printf("-----------------------------------------\n");
 }
 
 inline void HybridConvPerChannel(

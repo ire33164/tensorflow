@@ -333,13 +333,14 @@ TfLiteStatus MicroInterpreter::Invoke() {
   if (!tensors_allocated_) {
     TF_LITE_ENSURE_OK(&context_, AllocateTensors());
   }
-  size_t nvm_node_idx;
-  read_from_nvm(&nvm_node_idx, NODE_IDX, sizeof(nvm_node_idx));
-  // printf("NVM node idx %ld\n", nvm_node_idx);
+  // size_t nvm_node_idx;
+  // read_from_nvm(&nvm_node_idx, NODE_IDX + offset_nvm * OFFSET, sizeof(nvm_node_idx));
+  // if (nvm_node_idx >= subgraph_->operators()->size()) read_from_nvm(&nvm_node_idx, NODE_IDX + !offset_nvm * OFFSET, sizeof(nvm_node_idx));
   for (size_t i = 0; i < subgraph_->operators()->size(); ++i) {
+    if (is_power_failure) i = intermittent_params[offset_nvm].node_idx;
     auto* node = &(node_and_registrations_[i].node);
     auto* registration = node_and_registrations_[i].registration;
-    // printf("NODE idx %ld\n", i);
+
     if (registration->invoke) {
       TfLiteStatus invoke_status;
 #ifndef NDEBUG  // Omit profiler overhead from release builds.
@@ -350,7 +351,9 @@ TfLiteStatus MicroInterpreter::Invoke() {
       ScopedOperatorProfile scoped_profiler(
           profiler, OpNameFromRegistration(registration), i);
 #endif
-      write_to_nvm(&i, NODE_IDX, sizeof(i));
+      printf("NODE IDX  %ld\n", i);
+      // write_to_nvm(&i, NODE_IDX + offset_nvm * OFFSET, sizeof(i));
+      intermittent_params[offset_nvm].node_idx = i;
       invoke_status = registration->invoke(&context_, node);
 
       // All TfLiteTensor structs used in the kernel are allocated from temp

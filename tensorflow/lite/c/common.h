@@ -432,6 +432,21 @@ typedef struct TfLiteCustomAllocation {
   size_t bytes;
 } TfLiteCustomAllocation;
 
+// A data structure used to record the data backed up to NVM.
+typedef struct TfLiteIntermittentParams {
+  size_t node_idx;
+  int input_offset;
+  int output_offset;
+  int batch;
+  int out_y;
+  int out_x;
+  int out_channel;
+  // int filter_x;
+  // int filter_y;
+  // int32_t acc;
+  uint32_t version;
+} TfLiteIntermittentParams;
+
 // A tensor in the interpreter system which is a wrapper around a buffer of
 // data including a dimensionality (or NULL if not currently defined).
 #ifndef TF_LITE_STATIC_MEMORY
