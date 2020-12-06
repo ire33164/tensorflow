@@ -206,7 +206,7 @@ void EvalQuantized(TfLiteContext* context, TfLiteNode* node,
   op_params.output_shift = -data.output_shift;
   op_params.quantized_activation_min = data.output_activation_min;
   op_params.quantized_activation_max = data.output_activation_max;
-  printf("Conv  start\n");
+  printf("Conv start\n");
   reference_ops::Conv(op_params, tflite::micro::GetTensorShape(input),
                       tflite::micro::GetTensorData<uint8_t>(input),
                       tflite::micro::GetTensorShape(filter),

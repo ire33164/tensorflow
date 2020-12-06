@@ -156,19 +156,14 @@ inline void Conv(const ConvParams& params, const RuntimeShape& input_shape,
         if (is_power_failure) out_x = intermittent_params[offset_nvm].out_x;
         const int in_x_origin = (out_x * stride_width) - pad_width;
         for (int out_channel = 0; out_channel < output_depth; ++out_channel) {
-          if (is_power_failure) out_channel = intermittent_params[offset_nvm].out_channel, is_power_failure = false;
-          // Checkpoint forward progress infomation
-
-          intermittent_params[offset_nvm].node_idx = node_idx;
-          intermittent_params[offset_nvm].batch = batch;
-          intermittent_params[offset_nvm].out_y = out_y;
-          intermittent_params[offset_nvm].out_x = out_x;
-          intermittent_params[offset_nvm].out_channel = out_channel;
-          intermittent_params[offset_nvm].version = version;
-          write_to_nvm(&intermittent_params[offset_nvm], offset_nvm ? OFFSET : 0, sizeof(TfLiteIntermittentParams));
-          printf("version %d\n", version);
-          ++version;
-          offset_nvm = !offset_nvm;
+          if (is_power_failure) {
+            out_channel = intermittent_params[offset_nvm].out_channel + 1;
+            is_power_failure = false;
+            offset_nvm = !offset_nvm;
+            ++version;
+          }
+          // Finish the operator so we do not need to execute again
+          if (out_channel >= output_depth) continue;
 
           int32_t acc = 0;
           for (int filter_y = 0; filter_y < filter_height; ++filter_y) {
@@ -205,6 +200,17 @@ inline void Conv(const ConvParams& params, const RuntimeShape& input_shape,
           acc = std::min(acc, output_activation_max);
           output_data[Offset(output_shape, batch, out_y, out_x, out_channel)] =
               static_cast<uint8_t>(acc);
+          // Checkpoint forward progress infomation
+          intermittent_params[offset_nvm].node_idx = node_idx;
+          intermittent_params[offset_nvm].batch = batch;
+          intermittent_params[offset_nvm].out_y = out_y;
+          intermittent_params[offset_nvm].out_x = out_x;
+          intermittent_params[offset_nvm].out_channel = out_channel;
+          intermittent_params[offset_nvm].version = version;
+          write_to_nvm(&intermittent_params[offset_nvm], offset_nvm ? OFFSET : 0, sizeof(TfLiteIntermittentParams));
+          // printf("version %d\n", version);
+          ++version;
+          offset_nvm = !offset_nvm;
         }
       }
     }
