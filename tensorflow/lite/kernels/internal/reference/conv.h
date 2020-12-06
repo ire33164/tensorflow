@@ -17,7 +17,7 @@ limitations under the License.
 
 #include "tensorflow/lite/kernels/internal/types.h"
 #include "tensorflow/lite/kernels/internal/common.h"
-
+#include "tensorflow/lite/simulate_nvm.h"
 
 
 namespace tflite {
@@ -147,6 +147,7 @@ inline void Conv(const ConvParams& params, const RuntimeShape& input_shape,
         const int in_x_origin = (out_x * stride_width) - pad_width;
         for (int out_channel = 0; out_channel < output_depth; ++out_channel) {
           int32_t acc = 0;
+          /* Back up into NVM */
           for (int filter_y = 0; filter_y < filter_height; ++filter_y) {
             const int in_y = in_y_origin + dilation_height_factor * filter_y;
             for (int filter_x = 0; filter_x < filter_width; ++filter_x) {

@@ -7,54 +7,42 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <fcntl.h>
+#include <cerrno>
+#include <cstring>
 
-#define NVM_SIZE 512 * 1024
+#define NVM_SIZE          512 * 1024
+#define NODE_IDX          0
+#define NODE_INPUT        8
+#define NODE_OUTPUT       8  +  50 * 1024
+#define CONV_BATCH        8  + 100 * 1024
+#define CONV_OUT_Y        12 + 100 * 1024
+#define CONV_OUT_X        16 + 100 * 1024
+#define CONV_OUT_CHANNEL  20 + 100 * 1024
+#define CONV_FILTER_X     24 + 100 * 1024
+#define CONV_FILTER_Y     28 + 100 * 1024
+#define CONV_ACC          32 + 100 * 1024
+#define POOLING_BATCH     36 + 100 * 1024
+#define POOLING_OUT_Y     40 + 100 * 1024
+#define POOLING_OUT_X     44 + 100 * 1024
+#define POOLING_CHANNEL   48 + 100 * 1024
+#define POOLING_FILTER_X  52 + 100 * 1024
+#define POOLING_FILTER_   56 + 100 * 1024
+#define POOLING_MAX       60 + 100 * 1024
+#define FC_BATCH          61 + 100 * 1024
+#define FC_OUT_C          65 + 100 * 1024
+#define FC_ACCUM          69 + 100 * 1024
+#define FC_D              73 + 100 * 1024
+
 
 /* data on NVM, made persistent via mmap() with a file */
-uint8_t *nvm;
+extern uint8_t *nvm;
 
-void create_mmap() {
-  int nvm_fd = -1;
-  struct stat stat_buf;
-  if (stat("nvm.bin", &stat_buf) != 0) {
-    if (errno != ENOENT) {
-      perror("Checking nvm.bin failed");
-    }
-    nvm_fd = open("nvm.bin", O_RDWR|O_CREAT, 0600);
-    if(ftruncate(nvm_fd, NVM_SIZE) != 0) {
-      if (errno != ENOENT) {
-        perror("Ftruncating nvm failed.");
-      }
-    }
-  } else {
-    nvm_fd = open("nvm.bin", O_RDWR);
-  }
-  nvm = reinterpret_cast<uint8_t *>(mmap(NULL, NVM_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, nvm_fd, 0));
-  if (nvm == MAP_FAILED) {
-    perror("mmap() fail.");
-  }
-}
-
-void my_memcpy(void *dest, const void *src, size_t len) {
-  uint8_t *dest_u = reinterpret_cast<uint8_t *>(dest);
-  const uint8_t *src_u = reinterpret_cast<const uint8_t *>(src);
-  for(size_t idx = 0; idx < len; ++idx) {
-    dest_u[idx] = src_u[idx];
-  }
-}
-
-void read_from_nvm(void *vm_buffer, uint32_t nvm_offset, size_t len) {
-  my_memcpy(vm_buffer, nvm + nvm_offset, len);
-}
-
-void write_to_nvm(const void *vm_buffer, uint32_t nvm_offset, size_t len) {
-  my_memcpy(nvm + nvm_offset, vm_buffer, len);
-}
-
-void my_erase() {
-  memset(nvm, 0, NVM_SIZE);
-}
-
+void create_mmap();
+void my_memcpy(void *dest, const void *src, size_t len);
+void read_from_nvm(void *vm_buffer, uint32_t nvm_offset, size_t len);
+void write_to_nvm(const void *vm_buffer, uint32_t nvm_offset, size_t len);
+void my_erase();
 
 #endif // TENSORFLOW_LITE_SIMULATE_NVM_H

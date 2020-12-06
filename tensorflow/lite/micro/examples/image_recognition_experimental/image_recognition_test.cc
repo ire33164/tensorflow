@@ -68,7 +68,7 @@ TF_LITE_MICRO_TEST(TestImageRecognitionInvoke) {
   TF_LITE_MICRO_EXPECT_EQ(kTfLiteUInt8, input->type);
 
   int num_correct = 0;
-  int num_images = 10;
+  int num_images = 1;
   for (int image_num = 0; image_num < num_images; image_num++) {
     memset(input->data.uint8, 0, input->bytes);
 
@@ -82,7 +82,7 @@ TF_LITE_MICRO_TEST(TestImageRecognitionInvoke) {
                [image_num * ENTRY_BYTES + LABEL_BYTES],
            IMAGE_BYTES);
     reshape_cifar_image(input->data.uint8, IMAGE_BYTES);
-    printf("-------Start Inference------\n");
+    printf("-----Start Inference-----\n");
     TfLiteStatus invoke_status = interpreter.Invoke();
     TF_LITE_MICRO_EXPECT_EQ(kTfLiteOk, invoke_status);
     if (invoke_status != kTfLiteOk) {
