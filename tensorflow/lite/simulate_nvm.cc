@@ -1,7 +1,8 @@
-#include "/home/chia/Documents/tensorflow/tensorflow/lite/simulate_nvm.h"
-// #include "tensorflow/lite/simulate_nvm.h"
+// #include "/home/chia/Documents/tensorflow/tensorflow/lite/simulate_nvm.h"
+#include "tensorflow/lite/simulate_nvm.h"
 
 uint8_t *nvm;
+uint32_t version = 0;
 bool offset_nvm;
 bool is_power_failure;
 TfLiteIntermittentParams intermittent_params[2];

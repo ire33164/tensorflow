@@ -11,8 +11,8 @@
 #include <fcntl.h>
 #include <cerrno>
 #include <cstring>
-#include "/home/chia/Documents/tensorflow/tensorflow/lite/c/common.h"
-// #include "tensorflow/lite/c/common.h"
+// #include "/home/chia/Documents/tensorflow/tensorflow/lite/c/common.h"
+#include "tensorflow/lite/c/common.h"
 
 
 #define NVM_SIZE          512 * 1024
@@ -50,6 +50,7 @@ extern uint8_t *nvm;
 extern bool offset_nvm;
 extern bool is_power_failure;
 extern TfLiteIntermittentParams intermittent_params[2];
+extern uint32_t version;
 
 void create_mmap();
 void my_memcpy(void *dest, const void *src, size_t len);

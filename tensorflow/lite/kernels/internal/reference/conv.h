@@ -143,9 +143,7 @@ inline void Conv(const ConvParams& params, const RuntimeShape& input_shape,
   // const int input_length = input_height * input_width * input_depth;
   // const int output_length = output_height * output_width * output_depth;
 
-  uint32_t version;
   size_t node_idx;
-  version = intermittent_params[offset_nvm].version;
   node_idx = intermittent_params[offset_nvm].node_idx;
   for (int batch = 0; batch < batches; ++batch) {
     if (is_power_failure) batch = intermittent_params[offset_nvm].batch;
@@ -157,10 +155,10 @@ inline void Conv(const ConvParams& params, const RuntimeShape& input_shape,
         const int in_x_origin = (out_x * stride_width) - pad_width;
         for (int out_channel = 0; out_channel < output_depth; ++out_channel) {
           if (is_power_failure) {
+            version = intermittent_params[offset_nvm].version + 1;
             out_channel = intermittent_params[offset_nvm].out_channel + 1;
             is_power_failure = false;
             offset_nvm = !offset_nvm;
-            ++version;
           }
           // Finish the operator so we do not need to execute again
           if (out_channel >= output_depth) continue;
