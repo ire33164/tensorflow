@@ -140,11 +140,41 @@ inline void Conv(const ConvParams& params, const RuntimeShape& input_shape,
   const int filter_width = filter_shape.Dims(2);
   const int output_height = output_shape.Dims(1);
   const int output_width = output_shape.Dims(2);
-  // const int input_length = input_height * input_width * input_depth;
-  // const int output_length = output_height * output_width * output_depth;
+  const int input_length = input_height * input_width * input_depth;
+  const int output_length = output_height * output_width * output_depth;
+
+  if (!is_power_failure) {
+    // Backing up entire input data to NVM in order to avoid lose input data.
+    // Two cases:
+    // 1. When the program is running first, there is no the other version.
+    // 2. When the program is not running first, the other version exists.
+    intermittent_params[output_offset].input_version = !intermittent_params[output_offset].input_version;
+    write_to_nvm(const_cast<uint8_t *>(input_data), intermittent_params[offset_nvm].input_version ? NODE_INPUT2 : NODE_INPUT1, input_length);
+    /*
+    printf("Length %d\n", input_length);
+    printf("Finish writing input to NVM\n");
+    printf ("Input data: ");
+    for (int i = 0; i < input_length; ++i)
+      printf(" %d", input_data[i]);
+    printf("\n");
+    */
+  } else {
+    // Recover the node's input and output in VM.
+    read_from_nvm(const_cast<uint8_t *>(input_data), intermittent_params[offset_nvm].input_version ? NODE_INPUT2 : NODE_INPUT1, input_length);
+    /*
+    printf("Finish reading input data from NVM\n");
+    printf ("Input data: ");
+    for (int i = 0; i < input_length; ++i)
+      printf(" %d", input_data[i]);
+    printf("\n");
+    */
+    read_from_nvm(reinterpret_cast<void *>(output_data), offset_nvm ? NODE_OUTPUT2 : NODE_OUTPUT1, output_length);
+  }
 
   size_t node_idx;
+  bool input_version;
   node_idx = intermittent_params[offset_nvm].node_idx;
+  input_version = intermittent_params[offset_nvm].input_version;
   for (int batch = 0; batch < batches; ++batch) {
     if (is_power_failure) batch = intermittent_params[offset_nvm].batch;
     for (int out_y = 0; out_y < output_height; ++out_y) {
@@ -198,8 +228,11 @@ inline void Conv(const ConvParams& params, const RuntimeShape& input_shape,
           acc = std::min(acc, output_activation_max);
           output_data[Offset(output_shape, batch, out_y, out_x, out_channel)] =
               static_cast<uint8_t>(acc);
+          // Backing up output into NVM.
+          write_to_nvm(reinterpret_cast<void *>(output_data), offset_nvm ? NODE_OUTPUT2 : NODE_OUTPUT1, output_length);
           // Checkpoint forward progress infomation
           intermittent_params[offset_nvm].node_idx = node_idx;
+          intermittent_params[offset_nvm].input_version = input_version;
           intermittent_params[offset_nvm].batch = batch;
           intermittent_params[offset_nvm].out_y = out_y;
           intermittent_params[offset_nvm].out_x = out_x;
@@ -213,9 +246,11 @@ inline void Conv(const ConvParams& params, const RuntimeShape& input_shape,
       }
     }
   }
+  /*
   printf("-----------------------------------------\n");
   list_nvm();
   printf("-----------------------------------------\n");
+  */
 }
 
 inline void HybridConvPerChannel(

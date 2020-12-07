@@ -435,8 +435,8 @@ typedef struct TfLiteCustomAllocation {
 // A data structure used to record the data backed up to NVM.
 typedef struct TfLiteIntermittentParams {
   size_t node_idx;
-  int input_offset;
-  int output_offset;
+  bool input_version;
+  bool output_version;
   int batch;
   int out_y;
   int out_x;

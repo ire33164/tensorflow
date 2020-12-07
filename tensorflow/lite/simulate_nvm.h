@@ -11,6 +11,7 @@
 #include <fcntl.h>
 #include <cerrno>
 #include <cstring>
+#include <signal.h>
 // #include "/home/chia/Documents/tensorflow/tensorflow/lite/c/common.h"
 #include "tensorflow/lite/c/common.h"
 
@@ -45,6 +46,9 @@
 #define NODE_OUTPUT1      200 * 1024
 #define NODE_OUTPUT2      250 * 1024
 
+#define NODE_INPUT_TEST   300 * 1024
+#define NODE_OUTPUT_TEST  350 * 1024
+
 /* data on NVM, made persistent via mmap() with a file */
 extern uint8_t *nvm;
 extern bool offset_nvm;
@@ -52,6 +56,7 @@ extern bool is_power_failure;
 extern TfLiteIntermittentParams intermittent_params[2];
 extern uint32_t version;
 
+void my_handler(int signum);
 void create_mmap();
 void my_memcpy(void *dest, const void *src, size_t len);
 void read_from_nvm(void *vm_buffer, uint32_t nvm_offset, size_t len);

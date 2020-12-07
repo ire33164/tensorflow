@@ -18,6 +18,7 @@ limitations under the License.
 
 #include <stdint.h>
 #include <string.h>
+#include <cstdio>
 
 #define IMAGE_SIZE 3072
 #define CHANNEL_SIZE 1024
@@ -28,15 +29,17 @@ limitations under the License.
 int get_top_prediction(const uint8_t* predictions, int num_categories) {
   int max_score = predictions[0];
   int guess = 0;
-
+  printf("Score : ");
   for (int category_index = 1; category_index < num_categories;
        category_index++) {
     const uint8_t category_score = predictions[category_index];
+    printf(" %d", category_score);
     if (category_score > max_score) {
       max_score = category_score;
       guess = category_index;
     }
   }
+  printf("\n");
 
   return guess;
 }

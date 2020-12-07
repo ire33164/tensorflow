@@ -34,6 +34,8 @@ TF_LITE_MICRO_TEST(TestImageRecognitionInvoke) {
   tflite::MicroErrorReporter micro_error_reporter;
 
   create_mmap();
+  // Register signal and signal handler
+  signal(SIGINT, my_handler);
 
   const tflite::Model* model = ::tflite::GetModel(image_recognition_model_data);
   if (model->version() != TFLITE_SCHEMA_VERSION) {
@@ -68,8 +70,9 @@ TF_LITE_MICRO_TEST(TestImageRecognitionInvoke) {
   TF_LITE_MICRO_EXPECT_EQ(kTfLiteUInt8, input->type);
 
   // int num_correct = 0;
-  int num_images = 1;
-  for (int image_num = 0; image_num < num_images; image_num++) {
+  // int num_images = 10;
+  int image_num = 9;
+  // for (int image_num = 0; image_num < num_images; image_num++) {
     memset(input->data.uint8, 0, input->bytes);
 
     uint8_t correct_label = 0;
@@ -82,7 +85,7 @@ TF_LITE_MICRO_TEST(TestImageRecognitionInvoke) {
                [image_num * ENTRY_BYTES + LABEL_BYTES],
            IMAGE_BYTES);
     reshape_cifar_image(input->data.uint8, IMAGE_BYTES);
-    printf("-------Start Inference------\n");
+    printf("------Start Inference-----\n");
     TfLiteStatus invoke_status = interpreter.Invoke();
     TF_LITE_MICRO_EXPECT_EQ(kTfLiteOk, invoke_status);
     if (invoke_status != kTfLiteOk) {
@@ -91,7 +94,6 @@ TF_LITE_MICRO_TEST(TestImageRecognitionInvoke) {
 
     TfLiteTensor* output = interpreter.output(0);
     int guess = get_top_prediction(output->data.uint8, 10);
-
     if (correct_label == guess) {
       printf("------------------- Congratulations! ---------------------\n");
     } else {
@@ -103,7 +105,7 @@ TF_LITE_MICRO_TEST(TestImageRecognitionInvoke) {
     }
     */
     my_erase();
-  }
+  // }
   /*
   if (num_correct == 6) {
     printf("------------------- Congratulations! ---------------------\n");
