@@ -148,7 +148,7 @@ inline void Conv(const ConvParams& params, const RuntimeShape& input_shape,
     // Two cases:
     // 1. When the program is running first, there is no the other version.
     // 2. When the program is not running first, the other version exists.
-    intermittent_params[output_offset].input_version = !intermittent_params[output_offset].input_version;
+    intermittent_params[offset_nvm].input_version = !intermittent_params[offset_nvm].input_version;
     write_to_nvm(const_cast<uint8_t *>(input_data), intermittent_params[offset_nvm].input_version ? NODE_INPUT2 : NODE_INPUT1, input_length);
     /*
     printf("Length %d\n", input_length);

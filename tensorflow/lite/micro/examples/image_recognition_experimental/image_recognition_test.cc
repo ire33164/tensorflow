@@ -71,7 +71,7 @@ TF_LITE_MICRO_TEST(TestImageRecognitionInvoke) {
 
   // int num_correct = 0;
   // int num_images = 10;
-  int image_num = 9;
+  int image_num = 0;
   // for (int image_num = 0; image_num < num_images; image_num++) {
     memset(input->data.uint8, 0, input->bytes);
 
@@ -85,7 +85,7 @@ TF_LITE_MICRO_TEST(TestImageRecognitionInvoke) {
                [image_num * ENTRY_BYTES + LABEL_BYTES],
            IMAGE_BYTES);
     reshape_cifar_image(input->data.uint8, IMAGE_BYTES);
-    printf("------Start Inference-----\n");
+    // printf("------Start Inference-----\n");
     TfLiteStatus invoke_status = interpreter.Invoke();
     TF_LITE_MICRO_EXPECT_EQ(kTfLiteOk, invoke_status);
     if (invoke_status != kTfLiteOk) {
@@ -94,6 +94,7 @@ TF_LITE_MICRO_TEST(TestImageRecognitionInvoke) {
 
     TfLiteTensor* output = interpreter.output(0);
     int guess = get_top_prediction(output->data.uint8, 10);
+    //
     if (correct_label == guess) {
       printf("------------------- Congratulations! ---------------------\n");
     } else {

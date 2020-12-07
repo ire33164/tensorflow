@@ -119,7 +119,6 @@ TfLiteStatus EvalQuantizedInt8(TfLiteContext* context, TfLiteNode* node,
   op_params.output_shift = -data.output_shift;
   op_params.quantized_activation_min = data.output_activation_min;
   op_params.quantized_activation_max = data.output_activation_max;
-
   reference_integer_ops::FullyConnected(
       op_params, tflite::micro::GetTensorShape(input),
       tflite::micro::GetTensorData<int8_t>(input),

@@ -339,12 +339,14 @@ TfLiteStatus MicroInterpreter::Invoke() {
   for (size_t i = 0; i < subgraph_->operators()->size(); ++i) {
     if (is_power_failure) {
       i = intermittent_params[offset_nvm].node_idx;
+      /*
       printf("node idx: %ld\n", intermittent_params[offset_nvm].node_idx);
       printf("batch   : %d\n", intermittent_params[offset_nvm].batch);
       printf("out y   : %d\n", intermittent_params[offset_nvm].out_y);
       printf("out x   : %d\n", intermittent_params[offset_nvm].out_x);
       printf("out c   : %d\n", intermittent_params[offset_nvm].out_channel);
       printf("version : %d\n", intermittent_params[offset_nvm].version);
+      */
     }
     auto* node = &(node_and_registrations_[i].node);
     auto* registration = node_and_registrations_[i].registration;
