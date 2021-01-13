@@ -12,17 +12,17 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
-#ifndef TENSORFLOW_LITE_KERNELS_INTERNAL_REFERENCE_CONV_H_
-#define TENSORFLOW_LITE_KERNELS_INTERNAL_REFERENCE_CONV_H_
+#ifndef TENSORFLOW_LITE_KERNELS_INTERNAL_INTERMITTENT_CONV_H_
+#define TENSORFLOW_LITE_KERNELS_INTERNAL_INTERMITTENT_CONV_H_
 
 #include "tensorflow/lite/kernels/internal/types.h"
 #include "tensorflow/lite/kernels/internal/common.h"
-
-
+#include "tensorflow/lite/c/common.h"
+#include "tensorflow/lite/simulate_nvm.h"
 
 namespace tflite {
 
-namespace reference_ops {
+namespace intermittent_ops {
 
 
 inline void Conv(const ConvParams& params, const RuntimeShape& input_shape,
@@ -107,7 +107,7 @@ inline void Conv(const ConvParams& params, const RuntimeShape& input_shape,
                  const int32_t* bias_data, const RuntimeShape& output_shape,
                  uint8_t* output_data, const RuntimeShape& im2col_shape,
                  uint8_t* im2col_data, void* cpu_backend_context) {
-  printf("Reference CONV\n");
+  printf("Intermittent CONV \n");
   (void)cpu_backend_context;  // only used in optimized code.
   (void)im2col_data;   // only used in optimized code.
   (void)im2col_shape;  // only used in optimized code.
@@ -141,13 +141,59 @@ inline void Conv(const ConvParams& params, const RuntimeShape& input_shape,
   const int filter_width = filter_shape.Dims(2);
   const int output_height = output_shape.Dims(1);
   const int output_width = output_shape.Dims(2);
+  const int input_length = input_height * input_width * input_depth;
+  const int output_length = output_height * output_width * output_depth;
 
+  if (!is_power_failure) {
+    // Backing up entire input data to NVM in order to avoid lose input data.
+    // Two cases:
+    // 1. When the program is running first, there is no the other version.
+    // 2. When the program is not running first, the other version exists.
+    intermittent_params[offset_nvm].input_version = !intermittent_params[offset_nvm].input_version;
+    write_to_nvm(const_cast<uint8_t *>(input_data), intermittent_params[offset_nvm].input_version ? NODE_INPUT2 : NODE_INPUT1, input_length);
+    /*
+    printf("Length %d\n", input_length);
+    printf("Finish writing input to NVM\n");
+    printf ("Input data: ");
+    for (int i = 0; i < input_length; ++i)
+      printf(" %d", input_data[i]);
+    printf("\n");
+    */
+  } else {
+    // Recover the node's input and output in VM.
+    read_from_nvm(const_cast<uint8_t *>(input_data), intermittent_params[offset_nvm].input_version ? NODE_INPUT2 : NODE_INPUT1, input_length);
+    /*
+    printf("Finish reading input data from NVM\n");
+    printf ("Input data: ");
+    for (int i = 0; i < input_length; ++i)
+      printf(" %d", input_data[i]);
+    printf("\n");
+    */
+    read_from_nvm(reinterpret_cast<void *>(output_data), offset_nvm ? NODE_OUTPUT2 : NODE_OUTPUT1, output_length);
+  }
+
+  size_t node_idx;
+  bool input_version;
+  node_idx = intermittent_params[offset_nvm].node_idx;
+  input_version = intermittent_params[offset_nvm].input_version;
   for (int batch = 0; batch < batches; ++batch) {
+    if (is_power_failure) batch = intermittent_params[offset_nvm].batch;
     for (int out_y = 0; out_y < output_height; ++out_y) {
+      if (is_power_failure) out_y = intermittent_params[offset_nvm].out_y;
       const int in_y_origin = (out_y * stride_height) - pad_height;
       for (int out_x = 0; out_x < output_width; ++out_x) {
+        if (is_power_failure) out_x = intermittent_params[offset_nvm].out_x;
         const int in_x_origin = (out_x * stride_width) - pad_width;
         for (int out_channel = 0; out_channel < output_depth; ++out_channel) {
+          if (is_power_failure) {
+            version = intermittent_params[offset_nvm].version + 1;
+            out_channel = intermittent_params[offset_nvm].out_channel + 1;
+            is_power_failure = false;
+            offset_nvm = !offset_nvm;
+          }
+          // Finish the operator so we do not need to execute again
+          if (out_channel >= output_depth) continue;
+
           int32_t acc = 0;
           for (int filter_y = 0; filter_y < filter_height; ++filter_y) {
             const int in_y = in_y_origin + dilation_height_factor * filter_y;
@@ -183,10 +229,29 @@ inline void Conv(const ConvParams& params, const RuntimeShape& input_shape,
           acc = std::min(acc, output_activation_max);
           output_data[Offset(output_shape, batch, out_y, out_x, out_channel)] =
               static_cast<uint8_t>(acc);
+          // Backing up output into NVM.
+          write_to_nvm(reinterpret_cast<void *>(output_data), offset_nvm ? NODE_OUTPUT2 : NODE_OUTPUT1, output_length);
+          // Checkpoint forward progress infomation
+          intermittent_params[offset_nvm].node_idx = node_idx;
+          intermittent_params[offset_nvm].input_version = input_version;
+          intermittent_params[offset_nvm].batch = batch;
+          intermittent_params[offset_nvm].out_y = out_y;
+          intermittent_params[offset_nvm].out_x = out_x;
+          intermittent_params[offset_nvm].out_channel = out_channel;
+          intermittent_params[offset_nvm].version = version;
+          write_to_nvm(&intermittent_params[offset_nvm], offset_nvm ? OFFSET : 0, sizeof(TfLiteIntermittentParams));
+          // printf("version %d\n", version);
+          ++version;
+          offset_nvm = !offset_nvm;
         }
       }
     }
   }
+  /*
+  printf("-----------------------------------------\n");
+  list_nvm();
+  printf("-----------------------------------------\n");
+  */
 }
 
 inline void HybridConvPerChannel(
