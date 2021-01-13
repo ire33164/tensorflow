@@ -12,16 +12,17 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
-#ifndef TENSORFLOW_LITE_KERNELS_INTERNAL_REFERENCE_POOLING_H_
-#define TENSORFLOW_LITE_KERNELS_INTERNAL_REFERENCE_POOLING_H_
+#ifndef TENSORFLOW_LITE_KERNELS_INTERNAL_INTERMITTENT_POOLING_H_
+#define TENSORFLOW_LITE_KERNELS_INTERNAL_INTERMITTENT_POOLING_H_
 
 #include "tensorflow/lite/kernels/internal/common.h"
 #include "tensorflow/lite/kernels/internal/cppmath.h"
 #include "tensorflow/lite/kernels/internal/quantization_util.h"
 #include "tensorflow/lite/kernels/internal/types.h"
+#include "tensorflow/lite/simulate_nvm.h"
 
 namespace tflite {
-namespace reference_ops {
+namespace intermittent_ops {
 
 inline void AveragePool(const PoolParams& params,
                         const RuntimeShape& input_shape,
@@ -240,6 +241,7 @@ inline void MaxPool(const PoolParams& params, const RuntimeShape& input_shape,
 inline void MaxPool(const PoolParams& params, const RuntimeShape& input_shape,
                     const uint8_t* input_data, const RuntimeShape& output_shape,
                     uint8_t* output_data) {
+  printf("Intermittent POOLING\n");
   TFLITE_DCHECK_LE(params.quantized_activation_min,
                    params.quantized_activation_max);
   TFLITE_DCHECK_GE(params.quantized_activation_min, 0);
@@ -254,10 +256,59 @@ inline void MaxPool(const PoolParams& params, const RuntimeShape& input_shape,
   const int output_width = output_shape.Dims(2);
   const int stride_height = params.stride_height;
   const int stride_width = params.stride_width;
+  // for intermittent
+  const int input_length = input_height * input_width * depth;
+  const int output_length = output_height * output_width * depth;
+
+  if (!is_power_failure) {
+    // Backing up entire input data to NVM in order to avoid lose input data.
+    // Two cases:
+    // 1. When the program is running first, there is no the other version.
+    // 2. When the program is not running first, the other version exists.
+    intermittent_params[offset_nvm].input_version = !intermittent_params[offset_nvm].input_version;
+    write_to_nvm(const_cast<uint8_t *>(input_data), intermittent_params[offset_nvm].input_version ? NODE_INPUT2 : NODE_INPUT1, input_length);
+    /*
+    printf("Length %d\n", input_length);
+    printf("Finish writing input to NVM\n");
+    printf ("Input data: ");
+    for (int i = 0; i < input_length; ++i)
+      printf(" %d", input_data[i]);
+    printf("\n");
+    */
+  } else {
+    // Recover the node's input and output in VM.
+    read_from_nvm(const_cast<uint8_t *>(input_data), intermittent_params[offset_nvm].input_version ? NODE_INPUT2 : NODE_INPUT1, input_length);
+    /*
+    printf("Finish reading input data from NVM\n");
+    printf ("Input data: ");
+    for (int i = 0; i < input_length; ++i)
+      printf(" %d", input_data[i]);
+    printf("\n");
+    */
+    read_from_nvm(reinterpret_cast<void *>(output_data), offset_nvm ? NODE_OUTPUT2 : NODE_OUTPUT1, output_length);
+  }
+
+  size_t node_idx;
+  bool input_version;
+  node_idx = intermittent_params[offset_nvm].node_idx;
+  input_version = intermittent_params[offset_nvm].input_version;
   for (int batch = 0; batch < batches; ++batch) {
+    if (is_power_failure) batch = intermittent_params[offset_nvm].batch;
     for (int out_y = 0; out_y < output_height; ++out_y) {
+      if (is_power_failure) out_y = intermittent_params[offset_nvm].out_y;
       for (int out_x = 0; out_x < output_width; ++out_x) {
+        if (is_power_failure) out_x = intermittent_params[offset_nvm].out_x;
         for (int channel = 0; channel < depth; ++channel) {
+          if (is_power_failure) {
+            version = intermittent_params[offset_nvm].version + 1;
+            channel = intermittent_params[offset_nvm].out_channel + 1;
+            is_power_failure = false;
+            offset_nvm = !offset_nvm;
+          }
+          // Finish the operator so we do not need to execute again
+          if (channel >= depth) continue;
+
+
           const int in_x_origin =
               (out_x * stride_width) - params.padding_values.width;
           const int in_y_origin =
@@ -286,12 +337,26 @@ inline void MaxPool(const PoolParams& params, const RuntimeShape& input_shape,
           max = std::min<uint8_t>(max, params.quantized_activation_max);
           output_data[Offset(output_shape, batch, out_y, out_x, channel)] =
               static_cast<uint8_t>(max);
+          // Backing up output into NVM.
+          write_to_nvm(reinterpret_cast<void *>(output_data), offset_nvm ? NODE_OUTPUT2 : NODE_OUTPUT1, output_length);
+          // Checkpoint forward progress infomation
+          intermittent_params[offset_nvm].node_idx = node_idx;
+          intermittent_params[offset_nvm].input_version = input_version;
+          intermittent_params[offset_nvm].batch = batch;
+          intermittent_params[offset_nvm].out_y = out_y;
+          intermittent_params[offset_nvm].out_x = out_x;
+          intermittent_params[offset_nvm].out_channel = channel;
+          intermittent_params[offset_nvm].version = version;
+          write_to_nvm(&intermittent_params[offset_nvm], offset_nvm ? OFFSET : 0, sizeof(TfLiteIntermittentParams));
+          // printf("version %d\n", version);
+          ++version;
+          offset_nvm = !offset_nvm;
         }
       }
     }
   }
 }
-}  // namespace reference_ops
+}  // namespace intermittentt_ops
 }  // namespace tflite
 
-#endif  // TENSORFLOW_LITE_KERNELS_INTERNAL_REFERENCE_POOLING_H_
+#endif  // TENSORFLOW_LITE_KERNELS_INTERNAL_INTERMITTENT_POOLING_H_

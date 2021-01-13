@@ -14,6 +14,7 @@ limitations under the License.
 ==============================================================================*/
 
 #include "tensorflow/lite/kernels/internal/reference/softmax.h"
+#include "tensorflow/lite/kernels/internal/intermittent_ops/softmax.h"
 
 #include "tensorflow/lite/c/builtin_op_data.h"
 #include "tensorflow/lite/c/common.h"
@@ -100,9 +101,9 @@ void SoftmaxFloat(const TfLiteEvalTensor* input, TfLiteEvalTensor* output,
 
 void SoftmaxQuantized(const TfLiteEvalTensor* input, TfLiteEvalTensor* output,
                       const SoftmaxParams& op_data) {
-  printf("222222222222\n");
   if (input->type == kTfLiteUInt8) {
-    tflite::reference_ops::Softmax(
+    printf("Intermittent Version\n");
+    tflite::intermittent_ops::Softmax(
         op_data, tflite::micro::GetTensorShape(input),
         tflite::micro::GetTensorData<uint8_t>(input),
         tflite::micro::GetTensorShape(output),
@@ -115,7 +116,8 @@ void SoftmaxQuantized(const TfLiteEvalTensor* input, TfLiteEvalTensor* output,
           tflite::micro::GetTensorShape(output),
           tflite::micro::GetTensorData<int16_t>(output));
     } else {
-      tflite::reference_ops::Softmax(
+      printf("Intermittent Version\n");
+      tflite::intermittent_ops::Softmax(
           op_data, tflite::micro::GetTensorShape(input),
           tflite::micro::GetTensorData<int8_t>(input),
           tflite::micro::GetTensorShape(output),

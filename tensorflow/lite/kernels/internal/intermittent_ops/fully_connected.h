@@ -12,16 +12,17 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
-#ifndef TENSORFLOW_LITE_KERNELS_INTERNAL_REFERENCE_FULLY_CONNECTED_H_
-#define TENSORFLOW_LITE_KERNELS_INTERNAL_REFERENCE_FULLY_CONNECTED_H_
+#ifndef TENSORFLOW_LITE_KERNELS_INTERNAL_INTERMITTENT_FULLY_CONNECTED_H_
+#define TENSORFLOW_LITE_KERNELS_INTERNAL_INTERMITTENT_FULLY_CONNECTED_H_
 
 #include "tensorflow/lite/kernels/internal/common.h"
 #include "tensorflow/lite/kernels/internal/cppmath.h"
 #include "tensorflow/lite/kernels/internal/quantization_util.h"
 #include "tensorflow/lite/kernels/internal/types.h"
+#include "tensorflow/lite/simulate_nvm.h"
 
 namespace tflite {
-namespace reference_ops {
+namespace intermittent_ops {
 
 inline void FullyConnected(
     const FullyConnectedParams& params, const RuntimeShape& input_shape,
@@ -31,7 +32,7 @@ inline void FullyConnected(
     float* output_data) {
   const float output_activation_min = params.float_activation_min;
   const float output_activation_max = params.float_activation_max;
-  // TODO(benoitjacob): This really should be:
+  // TODO(b/62193649): This really should be:
   //     const int batches = ArraySize(output_dims, 1);
   // but the current --variable_batch hack consists in overwriting the 3rd
   // dimension with the runtime batch size, as we don't keep track for each
@@ -65,6 +66,7 @@ inline void FullyConnected(
     const uint8_t* filter_data, const RuntimeShape& bias_shape,
     const int32_t* bias_data, const RuntimeShape& output_shape,
     uint8_t* output_data) {
+  printf("Intermittent FC\n");
   const int32_t input_offset = params.input_offset;
   const int32_t filter_offset = params.weights_offset;
   const int32_t output_offset = params.output_offset;
@@ -76,7 +78,7 @@ inline void FullyConnected(
   TFLITE_DCHECK_GE(output_shape.DimensionsCount(), 1);
 
   TFLITE_DCHECK_LE(output_activation_min, output_activation_max);
-  // TODO(benoitjacob): This really should be:
+  // TODO(b/62193649): This really should be:
   //     const int batches = ArraySize(output_dims, 1);
   // but the current --variable_batch hack consists in overwriting the 3rd
   // dimension with the runtime batch size, as we don't keep track for each
@@ -87,8 +89,36 @@ inline void FullyConnected(
   const int output_depth = MatchingDim(filter_shape, filter_dim_count - 2,
                                        output_shape, output_dim_count - 1);
   const int accum_depth = filter_shape.Dims(filter_dim_count - 1);
+  // for intermitttent
+  const int input_length = input_shape.Dims(1) * input_shape.Dims(2) * output_depth;
+  const int output_length = output_depth;
+  if (!is_power_failure) {
+    // Backing up entire input data to NVM in order to avoid lose input data.
+    intermittent_params[offset_nvm].input_version = !intermittent_params[offset_nvm].input_version;
+    write_to_nvm(const_cast<uint8_t *>(input_data), intermittent_params[offset_nvm].input_version ? NODE_INPUT2 : NODE_INPUT1, input_length);
+  } else {
+    // Recover the node's input and output in VM.
+    read_from_nvm(const_cast<uint8_t *>(input_data), intermittent_params[offset_nvm].input_version ? NODE_INPUT2 : NODE_INPUT1, input_length);
+    read_from_nvm(reinterpret_cast<void *>(output_data), offset_nvm ? NODE_OUTPUT2 : NODE_OUTPUT1, output_length);
+  }
+
+  size_t node_idx;
+  bool input_version;
+  node_idx = intermittent_params[offset_nvm].node_idx;
+  input_version = intermittent_params[offset_nvm].input_version;
+
   for (int b = 0; b < batches; ++b) {
+    if (is_power_failure) b = intermittent_params[offset_nvm].batch;
     for (int out_c = 0; out_c < output_depth; ++out_c) {
+      if (is_power_failure) {
+        version = intermittent_params[offset_nvm].version + 1;
+        out_c = intermittent_params[offset_nvm].out_channel + 1;
+        is_power_failure = false;
+        offset_nvm = !offset_nvm;
+      }
+      // Finish the operator so we do not need to execute again
+      if (out_c >= output_depth) continue;
+
       int32_t acc = 0;
       for (int d = 0; d < accum_depth; ++d) {
         int32_t input_val = input_data[b * accum_depth + d];
@@ -103,6 +133,19 @@ inline void FullyConnected(
       acc = std::max(acc, output_activation_min);
       acc = std::min(acc, output_activation_max);
       output_data[out_c + output_depth * b] = static_cast<uint8_t>(acc);
+      // for intermittent
+      write_to_nvm(reinterpret_cast<void *>(output_data), offset_nvm ? NODE_OUTPUT2 : NODE_OUTPUT1, output_length);
+      // Checkpoint forward progress infomation
+      intermittent_params[offset_nvm].node_idx = node_idx;
+      intermittent_params[offset_nvm].input_version = input_version;
+      intermittent_params[offset_nvm].batch = b;
+      intermittent_params[offset_nvm].out_channel = out_c;
+      intermittent_params[offset_nvm].version = version;
+      write_to_nvm(&intermittent_params[offset_nvm], offset_nvm ? OFFSET : 0, sizeof(TfLiteIntermittentParams));
+      // printf("version %d\n", version);
+      ++version;
+      offset_nvm = !offset_nvm;
+
     }
   }
 }
@@ -123,7 +166,7 @@ inline void FullyConnected(
 
   TFLITE_DCHECK_LE(output_activation_min, output_activation_max);
   TFLITE_DCHECK_EQ(output_offset, 0);
-  // TODO(benoitjacob): This really should be:
+  // TODO(b/62193649): This really should be:
   //     const int batches = ArraySize(output_dims, 1);
   // but the current --variable_batch hack consists in overwriting the 3rd
   // dimension with the runtime batch size, as we don't keep track for each
@@ -176,7 +219,7 @@ inline void ShuffledFullyConnected(
   TFLITE_DCHECK_GE(input_shape.DimensionsCount(), 1);
   TFLITE_DCHECK_GE(weights_shape.DimensionsCount(), 2);
   TFLITE_DCHECK_GE(output_shape.DimensionsCount(), 1);
-  // TODO(benoitjacob): This really should be:
+  // TODO(b/62193649): This really should be:
   //     const int batches = ArraySize(output_dims, 1);
   // but the current --variable_batch hack consists in overwriting the 3rd
   // dimension with the runtime batch size, as we don't keep track for each
@@ -314,7 +357,7 @@ inline void ShuffledFullyConnected(
   }
 }
 
-}  // namespace reference_ops
+}  // namespace intermittent_ops
 }  // namespace tflite
 
-#endif  // TENSORFLOW_LITE_KERNELS_INTERNAL_REFERENCE_FULLY_CONNECTED_H_
+#endif  // TENSORFLOW_LITE_KERNELS_INTERNALINTERMITTENT_FULLY_CONNECTED_H_
