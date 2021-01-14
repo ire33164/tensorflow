@@ -259,6 +259,10 @@ inline void MaxPool(const PoolParams& params, const RuntimeShape& input_shape,
   // for intermittent
   const int input_length = input_height * input_width * depth;
   const int output_length = output_height * output_width * depth;
+  int tmp_batch = 0;
+  int tmp_out_y = 0;
+  int tmp_out_x = 0;
+  int tmp_channel = 0;
 
   if (!is_power_failure) {
     // Backing up entire input data to NVM in order to avoid lose input data.
@@ -267,25 +271,15 @@ inline void MaxPool(const PoolParams& params, const RuntimeShape& input_shape,
     // 2. When the program is not running first, the other version exists.
     intermittent_params[offset_nvm].input_version = !intermittent_params[offset_nvm].input_version;
     write_to_nvm(const_cast<uint8_t *>(input_data), intermittent_params[offset_nvm].input_version ? NODE_INPUT2 : NODE_INPUT1, input_length);
-    /*
-    printf("Length %d\n", input_length);
-    printf("Finish writing input to NVM\n");
-    printf ("Input data: ");
-    for (int i = 0; i < input_length; ++i)
-      printf(" %d", input_data[i]);
-    printf("\n");
-    */
   } else {
     // Recover the node's input and output in VM.
     read_from_nvm(const_cast<uint8_t *>(input_data), intermittent_params[offset_nvm].input_version ? NODE_INPUT2 : NODE_INPUT1, input_length);
-    /*
-    printf("Finish reading input data from NVM\n");
-    printf ("Input data: ");
-    for (int i = 0; i < input_length; ++i)
-      printf(" %d", input_data[i]);
-    printf("\n");
-    */
     read_from_nvm(reinterpret_cast<void *>(output_data), offset_nvm ? NODE_OUTPUT2 : NODE_OUTPUT1, output_length);
+    int OFM_cnt = intermittent_params[offset_nvm].OFM_cnt;
+    tmp_batch = OFM_cnt / (output_height * output_width * depth);
+    tmp_out_y = (OFM_cnt - tmp_batch * (output_width * output_height * depth)) / (output_width * depth);
+    tmp_out_x = (OFM_cnt - tmp_batch * (output_width * output_height * depth) - tmp_out_y * (output_width * depth)) / depth;
+    tmp_channel = OFM_cnt - tmp_batch * (output_width * output_height * depth) - tmp_out_y * (output_width * depth) - tmp_out_x * depth;
   }
 
   size_t node_idx;
@@ -293,15 +287,15 @@ inline void MaxPool(const PoolParams& params, const RuntimeShape& input_shape,
   node_idx = intermittent_params[offset_nvm].node_idx;
   input_version = intermittent_params[offset_nvm].input_version;
   for (int batch = 0; batch < batches; ++batch) {
-    if (is_power_failure) batch = intermittent_params[offset_nvm].batch;
+    if (is_power_failure) batch = tmp_batch;
     for (int out_y = 0; out_y < output_height; ++out_y) {
-      if (is_power_failure) out_y = intermittent_params[offset_nvm].out_y;
+      if (is_power_failure) out_y = tmp_out_y;
       for (int out_x = 0; out_x < output_width; ++out_x) {
-        if (is_power_failure) out_x = intermittent_params[offset_nvm].out_x;
+        if (is_power_failure) out_x = tmp_out_x;
         for (int channel = 0; channel < depth; ++channel) {
           if (is_power_failure) {
             version = intermittent_params[offset_nvm].version + 1;
-            channel = intermittent_params[offset_nvm].out_channel + 1;
+            channel = tmp_channel + 1;
             is_power_failure = false;
             offset_nvm = !offset_nvm;
           }
@@ -342,10 +336,13 @@ inline void MaxPool(const PoolParams& params, const RuntimeShape& input_shape,
           // Checkpoint forward progress infomation
           intermittent_params[offset_nvm].node_idx = node_idx;
           intermittent_params[offset_nvm].input_version = input_version;
+          intermittent_params[offset_nvm].OFM_cnt = batch * (output_width * output_height * depth) + out_y * (output_width * depth) + out_x * depth + channel;
+          /*
           intermittent_params[offset_nvm].batch = batch;
           intermittent_params[offset_nvm].out_y = out_y;
           intermittent_params[offset_nvm].out_x = out_x;
           intermittent_params[offset_nvm].out_channel = channel;
+          */
           intermittent_params[offset_nvm].version = version;
           write_to_nvm(&intermittent_params[offset_nvm], offset_nvm ? OFFSET : 0, sizeof(TfLiteIntermittentParams));
           // printf("version %d\n", version);

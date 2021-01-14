@@ -143,6 +143,10 @@ inline void Conv(const ConvParams& params, const RuntimeShape& input_shape,
   const int output_width = output_shape.Dims(2);
   const int input_length = input_height * input_width * input_depth;
   const int output_length = output_height * output_width * output_depth;
+  int tmp_batch = 0;
+  int tmp_out_y = 0;
+  int tmp_out_x = 0;
+  int tmp_out_channel = 0;
 
   if (!is_power_failure) {
     // Backing up entire input data to NVM in order to avoid lose input data.
@@ -151,43 +155,39 @@ inline void Conv(const ConvParams& params, const RuntimeShape& input_shape,
     // 2. When the program is not running first, the other version exists.
     intermittent_params[offset_nvm].input_version = !intermittent_params[offset_nvm].input_version;
     write_to_nvm(const_cast<uint8_t *>(input_data), intermittent_params[offset_nvm].input_version ? NODE_INPUT2 : NODE_INPUT1, input_length);
-    /*
-    printf("Length %d\n", input_length);
-    printf("Finish writing input to NVM\n");
-    printf ("Input data: ");
-    for (int i = 0; i < input_length; ++i)
-      printf(" %d", input_data[i]);
-    printf("\n");
-    */
   } else {
     // Recover the node's input and output in VM.
     read_from_nvm(const_cast<uint8_t *>(input_data), intermittent_params[offset_nvm].input_version ? NODE_INPUT2 : NODE_INPUT1, input_length);
-    /*
-    printf("Finish reading input data from NVM\n");
-    printf ("Input data: ");
-    for (int i = 0; i < input_length; ++i)
-      printf(" %d", input_data[i]);
-    printf("\n");
-    */
     read_from_nvm(reinterpret_cast<void *>(output_data), offset_nvm ? NODE_OUTPUT2 : NODE_OUTPUT1, output_length);
+    int OFM_cnt = intermittent_params[offset_nvm].OFM_cnt;
+    tmp_batch = OFM_cnt / (output_height * output_width * output_depth);
+    tmp_out_y =(OFM_cnt - tmp_batch * (output_height * output_width * output_depth)) / (output_width * output_depth) ;
+    tmp_out_x = (OFM_cnt - tmp_batch * (output_height * output_width * output_depth) - tmp_out_y * (output_width * output_depth)) / output_depth;
+    tmp_out_channel = OFM_cnt - tmp_batch * (output_height * output_width * output_depth) - tmp_out_y * (output_width * output_depth) - tmp_out_x * output_depth;
+    /*
+    printf("Calculate\n");
+    printf("batch: %d\nout_y: %d\nout_x: %d\nout_channel: %d\n", tmp_batch, tmp_out_y, tmp_out_x, tmp_out_channel);
+    printf("Correct\n");
+    printf("batch: %d\nout_y: %d\nout_x: %d\nout_channel: %d\n", intermittent_params[offset_nvm].batch, intermittent_params[offset_nvm].out_y, intermittent_params[offset_nvm].out_x, intermittent_params[offset_nvm].out_channel);
+    */
   }
 
   size_t node_idx;
   bool input_version;
   node_idx = intermittent_params[offset_nvm].node_idx;
   input_version = intermittent_params[offset_nvm].input_version;
-  for (int batch = 0; batch < batches; ++batch) {
-    if (is_power_failure) batch = intermittent_params[offset_nvm].batch;
+  for (int batch = tmp_batch; batch < batches; ++batch) {
+    if (is_power_failure) batch = tmp_batch;
     for (int out_y = 0; out_y < output_height; ++out_y) {
-      if (is_power_failure) out_y = intermittent_params[offset_nvm].out_y;
+      if (is_power_failure) out_y = tmp_out_y;
       const int in_y_origin = (out_y * stride_height) - pad_height;
       for (int out_x = 0; out_x < output_width; ++out_x) {
-        if (is_power_failure) out_x = intermittent_params[offset_nvm].out_x;
+        if (is_power_failure) out_x = tmp_out_x;
         const int in_x_origin = (out_x * stride_width) - pad_width;
         for (int out_channel = 0; out_channel < output_depth; ++out_channel) {
           if (is_power_failure) {
             version = intermittent_params[offset_nvm].version + 1;
-            out_channel = intermittent_params[offset_nvm].out_channel + 1;
+            out_channel = tmp_out_channel + 1;
             is_power_failure = false;
             offset_nvm = !offset_nvm;
           }
@@ -234,10 +234,13 @@ inline void Conv(const ConvParams& params, const RuntimeShape& input_shape,
           // Checkpoint forward progress infomation
           intermittent_params[offset_nvm].node_idx = node_idx;
           intermittent_params[offset_nvm].input_version = input_version;
+          intermittent_params[offset_nvm].OFM_cnt = batch * output_height * output_width * output_depth + out_y * output_width * output_depth + out_x * output_depth + out_channel;
+          /*
           intermittent_params[offset_nvm].batch = batch;
           intermittent_params[offset_nvm].out_y = out_y;
           intermittent_params[offset_nvm].out_x = out_x;
           intermittent_params[offset_nvm].out_channel = out_channel;
+          */
           intermittent_params[offset_nvm].version = version;
           write_to_nvm(&intermittent_params[offset_nvm], offset_nvm ? OFFSET : 0, sizeof(TfLiteIntermittentParams));
           // printf("version %d\n", version);

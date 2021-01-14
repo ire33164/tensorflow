@@ -92,6 +92,9 @@ inline void FullyConnected(
   // for intermitttent
   const int input_length = input_shape.Dims(1) * input_shape.Dims(2) * output_depth;
   const int output_length = output_depth;
+  int tmp_batch = 0;
+  int tmp_channel = 0;
+
   if (!is_power_failure) {
     // Backing up entire input data to NVM in order to avoid lose input data.
     intermittent_params[offset_nvm].input_version = !intermittent_params[offset_nvm].input_version;
@@ -100,6 +103,9 @@ inline void FullyConnected(
     // Recover the node's input and output in VM.
     read_from_nvm(const_cast<uint8_t *>(input_data), intermittent_params[offset_nvm].input_version ? NODE_INPUT2 : NODE_INPUT1, input_length);
     read_from_nvm(reinterpret_cast<void *>(output_data), offset_nvm ? NODE_OUTPUT2 : NODE_OUTPUT1, output_length);
+    int OFM_cnt = intermittent_params[offset_nvm].OFM_cnt;
+    tmp_batch = OFM_cnt / output_depth;
+    tmp_channel = OFM_cnt - tmp_batch * output_depth;
   }
 
   size_t node_idx;
@@ -108,11 +114,11 @@ inline void FullyConnected(
   input_version = intermittent_params[offset_nvm].input_version;
 
   for (int b = 0; b < batches; ++b) {
-    if (is_power_failure) b = intermittent_params[offset_nvm].batch;
+    if (is_power_failure) b = tmp_batch;
     for (int out_c = 0; out_c < output_depth; ++out_c) {
       if (is_power_failure) {
         version = intermittent_params[offset_nvm].version + 1;
-        out_c = intermittent_params[offset_nvm].out_channel + 1;
+        out_c = tmp_channel + 1;
         is_power_failure = false;
         offset_nvm = !offset_nvm;
       }
@@ -138,11 +144,13 @@ inline void FullyConnected(
       // Checkpoint forward progress infomation
       intermittent_params[offset_nvm].node_idx = node_idx;
       intermittent_params[offset_nvm].input_version = input_version;
+      intermittent_params[offset_nvm].OFM_cnt = b * output_depth + out_c;
+      /*
       intermittent_params[offset_nvm].batch = b;
       intermittent_params[offset_nvm].out_channel = out_c;
+      */
       intermittent_params[offset_nvm].version = version;
       write_to_nvm(&intermittent_params[offset_nvm], offset_nvm ? OFFSET : 0, sizeof(TfLiteIntermittentParams));
-      // printf("version %d\n", version);
       ++version;
       offset_nvm = !offset_nvm;
 

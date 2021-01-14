@@ -437,10 +437,13 @@ typedef struct TfLiteIntermittentParams {
   size_t node_idx;
   bool input_version;
   bool output_version;
+  int OFM_cnt;
+  /*
   int batch;
   int out_y;
   int out_x;
   int out_channel;
+  */
   // int filter_x;
   // int filter_y;
   // int32_t acc;

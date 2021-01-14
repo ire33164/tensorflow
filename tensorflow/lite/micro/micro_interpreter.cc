@@ -341,10 +341,7 @@ TfLiteStatus MicroInterpreter::Invoke() {
       i = intermittent_params[offset_nvm].node_idx;
       /*
       printf("node idx: %ld\n", intermittent_params[offset_nvm].node_idx);
-      printf("batch   : %d\n", intermittent_params[offset_nvm].batch);
-      printf("out y   : %d\n", intermittent_params[offset_nvm].out_y);
-      printf("out x   : %d\n", intermittent_params[offset_nvm].out_x);
-      printf("out c   : %d\n", intermittent_params[offset_nvm].out_channel);
+      printf("OFM_cnt : %d\n", intermittent_params[offset_nvm].OFM_cnt);
       printf("version : %d\n", intermittent_params[offset_nvm].version);
       */
     }
@@ -361,7 +358,7 @@ TfLiteStatus MicroInterpreter::Invoke() {
       ScopedOperatorProfile scoped_profiler(
           profiler, OpNameFromRegistration(registration), i);
 #endif
-      // printf("------------------------- NODE IDX  %ld ------------------------\n", i);
+      printf("----------------------- NODE IDX  %ld ------------------------\n", i);
       // write_to_nvm(&i, NODE_IDX + offset_nvm * OFFSET, sizeof(i));
       intermittent_params[offset_nvm].node_idx = i;
       // list_nvm();
