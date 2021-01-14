@@ -29,17 +29,26 @@ limitations under the License.
 int get_top_prediction(const uint8_t* predictions, int num_categories) {
   int max_score = predictions[0];
   int guess = 0;
-  printf("Score : ");
+  int res[10] = {0, 1, 2, 242, 1, 7, 2, 0, 0, 1};
+  int score[10] = {0};
   for (int category_index = 1; category_index < num_categories;
        category_index++) {
     const uint8_t category_score = predictions[category_index];
-    printf(" %d", category_score);
+    score[category_index] = category_score;
     if (category_score > max_score) {
       max_score = category_score;
       guess = category_index;
     }
   }
-  printf("\n");
+  for (int idx = 1; idx < 10; idx++) {
+    if (score[idx] != res[idx]) {
+      printf("------------------- You are pathetic ---------------------\n");
+      break;
+    }
+    if (idx == 9) {
+      printf("------------------- Congratulations! ---------------------\n");
+    }
+  }
 
   return guess;
 }

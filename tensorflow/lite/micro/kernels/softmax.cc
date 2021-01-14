@@ -100,7 +100,6 @@ void SoftmaxFloat(const TfLiteEvalTensor* input, TfLiteEvalTensor* output,
 
 void SoftmaxQuantized(const TfLiteEvalTensor* input, TfLiteEvalTensor* output,
                       const SoftmaxParams& op_data) {
-  printf("222222222222\n");
   if (input->type == kTfLiteUInt8) {
     tflite::reference_ops::Softmax(
         op_data, tflite::micro::GetTensorShape(input),

@@ -1,4 +1,3 @@
-// #include "/home/chia/Documents/tensorflow/tensorflow/lite/simulate_nvm.h"
 #include "tensorflow/lite/simulate_nvm.h"
 
 uint8_t *nvm;
@@ -48,6 +47,9 @@ void create_mmap() {
 
 void my_memcpy(void *dest, const void *src, size_t len) {
   printf("Copying\n");
+  printf("Copying\n");
+  printf("Copying\n");
+  printf("Copying\n");
   uint8_t *dest_u = reinterpret_cast<uint8_t *>(dest);
   const uint8_t *src_u = reinterpret_cast<const uint8_t *>(src);
   for(size_t idx = 0; idx < len; ++idx) {
@@ -74,12 +76,6 @@ void list_nvm() {
   for (int i = 0; i < 2; ++i) {
     printf("node idx: %ld\n", intermittent_params[i].node_idx);
     printf("OFM_cnt   : %d\n", intermittent_params[i].OFM_cnt);
-    /*
-    printf("batch   : %d\n", intermittent_params[i].batch);
-    printf("out y   : %d\n", intermittent_params[i].out_y);
-    printf("out x   : %d\n", intermittent_params[i].out_x);
-    printf("out c   : %d\n", intermittent_params[i].out_channel);
-    */
     printf("version : %d\n", intermittent_params[i].version);
   }
 }

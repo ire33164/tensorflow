@@ -57,33 +57,55 @@ inline void DepthwiseConvPerChannel(
   const int filter_width = filter_shape.Dims(2);
   const int output_height = output_shape.Dims(1);
   const int output_width = output_shape.Dims(2);
+  const int input_length = input_height * input_width * input_depth;
+  const int output_length = output_height * output_width * output_depth;
   TFLITE_DCHECK_EQ(output_depth, input_depth * depth_multiplier);
   TFLITE_DCHECK_EQ(bias_shape.FlatSize(), output_depth);
-  /*
+  int tmp_batch = 0;
+  int tmp_out_y = 0;
+  int tmp_out_x = 0;
+  int tmp_in_channel = 0;
+  int tmp_m = 0;
+
   if (!is_power_failure) {
     // Backing up entire input data to NVM in order to avoid lose input data.
     // Two cases:
     // 1. When the program is running first, there is no the other version.
     // 2. When the program is not running first, the other version exists.
     intermittent_params[offset_nvm].input_version = !intermittent_params[offset_nvm].input_version;
-    write_to_nvm(const_cast<uint8_t *>(input_data), intermittent_params[offset_nvm].input_version ? NODE_INPUT2 : NODE_INPUT1, input_length);
+    write_to_nvm(const_cast<int8_t *>(input_data), intermittent_params[offset_nvm].input_version ? NODE_INPUT2 : NODE_INPUT1, input_length);
   } else {
     // Recover the node's input and output in VM.
-    read_from_nvm(const_cast<uint8_t *>(input_data), intermittent_params[offset_nvm].input_version ? NODE_INPUT2 : NODE_INPUT1, input_length);
+    read_from_nvm(const_cast<int8_t *>(input_data), intermittent_params[offset_nvm].input_version ? NODE_INPUT2 : NODE_INPUT1, input_length);
     read_from_nvm(reinterpret_cast<void *>(output_data), offset_nvm ? NODE_OUTPUT2 : NODE_OUTPUT1, output_length);
+    int OFM_cnt = intermittent_params[offset_nvm].OFM_cnt;
+    tmp_batch = OFM_cnt / (output_height * output_width * input_depth * depth_multiplier);
+    tmp_out_y =(OFM_cnt - tmp_batch * (output_height * output_width * input_depth * depth_multiplier)) / (output_width * input_depth * depth_multiplier) ;
+    tmp_out_x = (OFM_cnt - tmp_batch * (output_height * output_width * input_depth * depth_multiplier) - tmp_out_y * (output_width * input_depth * depth_multiplier)) / (input_depth * depth_multiplier);
+    tmp_in_channel =  (OFM_cnt - tmp_batch * (output_height * output_width * input_depth * depth_multiplier) - tmp_out_y * (output_width * input_depth * depth_multiplier) - tmp_out_x * (input_depth * depth_multiplier)) / depth_multiplier;
+    tmp_m =  OFM_cnt - tmp_batch * (output_height * output_width * input_depth * depth_multiplier) - tmp_out_y * (output_width * input_depth * depth_multiplier) - tmp_out_x * (input_depth * depth_multiplier) - tmp_in_channel * depth_multiplier;
   }
 
   size_t node_idx;
   bool input_version;
   node_idx = intermittent_params[offset_nvm].node_idx;
   input_version = intermittent_params[offset_nvm].input_version;
-  */
-
   for (int batch = 0; batch < batches; ++batch) {
+    if (is_power_failure) batch = tmp_batch;
     for (int out_y = 0; out_y < output_height; ++out_y) {
+      if (is_power_failure) out_y = tmp_out_y;
       for (int out_x = 0; out_x < output_width; ++out_x) {
+        if (is_power_failure) out_x = tmp_out_x;
         for (int in_channel = 0; in_channel < input_depth; ++in_channel) {
+          if (is_power_failure) in_channel = tmp_in_channel;
           for (int m = 0; m < depth_multiplier; ++m) {
+            if (is_power_failure) {
+              version = intermittent_params[offset_nvm].version + 1;
+              m = tmp_m + 1;
+              is_power_failure = false;
+              offset_nvm = !offset_nvm;
+            }
+
             const int output_channel = m + in_channel * depth_multiplier;
             const int in_x_origin = (out_x * stride_width) - pad_width;
             const int in_y_origin = (out_y * stride_height) - pad_height;
@@ -133,6 +155,16 @@ inline void DepthwiseConvPerChannel(
             acc = std::min(acc, output_activation_max);
             output_data[Offset(output_shape, batch, out_y, out_x,
                                output_channel)] = static_cast<int8_t>(acc);
+            // Backing up output into NVM.
+            write_to_nvm(reinterpret_cast<void *>(output_data), offset_nvm ? NODE_OUTPUT2 : NODE_OUTPUT1, output_length);
+            // Checkpoint forward progress infomation
+            intermittent_params[offset_nvm].node_idx = node_idx;
+            intermittent_params[offset_nvm].input_version = input_version;
+            intermittent_params[offset_nvm].OFM_cnt = batch * (output_height * output_width * input_depth * depth_multiplier) + out_y * (output_width * input_depth * depth_multiplier) + out_x * (input_depth * depth_multiplier) + in_channel * depth_multiplier + m;
+            intermittent_params[offset_nvm].version = version;
+            write_to_nvm(&intermittent_params[offset_nvm], offset_nvm ? OFFSET : 0, sizeof(TfLiteIntermittentParams));
+            ++version;
+            offset_nvm = !offset_nvm;
           }
         }
       }

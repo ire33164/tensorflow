@@ -127,6 +127,7 @@ void MaxEvalFloat(TfLiteContext* context, TfLiteNode* node,
 void MaxEvalQuantized(TfLiteContext* context, TfLiteNode* node,
                       TfLitePoolParams* params, const OpData* data,
                       const TfLiteEvalTensor* input, TfLiteEvalTensor* output) {
+  printf("Reference Pooling\n");
   tflite::PoolParams op_params;
   op_params.stride_height = params->stride_height;
   op_params.stride_width = params->stride_width;

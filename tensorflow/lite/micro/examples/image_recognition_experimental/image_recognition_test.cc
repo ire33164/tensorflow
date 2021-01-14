@@ -75,17 +75,17 @@ TF_LITE_MICRO_TEST(TestImageRecognitionInvoke) {
   // for (int image_num = 0; image_num < num_images; image_num++) {
     memset(input->data.uint8, 0, input->bytes);
 
-    uint8_t correct_label = 0;
+    // uint8_t correct_label = 0;
 
-    correct_label =
-        tensorflow_lite_micro_tools_make_downloads_cifar10_test_batch_bin
-            [image_num * ENTRY_BYTES];
+    // correct_label =
+    //     tensorflow_lite_micro_tools_make_downloads_cifar10_test_batch_bin
+    //         [image_num * ENTRY_BYTES];
     memcpy(input->data.uint8,
            &tensorflow_lite_micro_tools_make_downloads_cifar10_test_batch_bin
                [image_num * ENTRY_BYTES + LABEL_BYTES],
            IMAGE_BYTES);
     reshape_cifar_image(input->data.uint8, IMAGE_BYTES);
-    // printf("------Start Inference-----\n");
+
     TfLiteStatus invoke_status = interpreter.Invoke();
     TF_LITE_MICRO_EXPECT_EQ(kTfLiteOk, invoke_status);
     if (invoke_status != kTfLiteOk) {
@@ -93,28 +93,14 @@ TF_LITE_MICRO_TEST(TestImageRecognitionInvoke) {
     }
 
     TfLiteTensor* output = interpreter.output(0);
-    int guess = get_top_prediction(output->data.uint8, 10);
-    //
-    if (correct_label == guess) {
-      printf("------------------- Congratulations! ---------------------\n");
-    } else {
-      printf("------------------- You are pathetic ---------------------\n");
-    }
+    get_top_prediction(output->data.uint8, 10);
     /*
     if (correct_label == guess) {
       num_correct++;
     }
     */
     my_erase();
-  // }
-  /*
-  if (num_correct == 6) {
-    printf("------------------- Congratulations! ---------------------\n");
-  } else {
-    printf("------------------- You are pathetic ---------------------\n");
-  }
-  */
-  // TF_LITE_MICRO_EXPECT_EQ(6, num_correct);
+    // TF_LITE_MICRO_EXPECT_EQ(6, num_correct);
 }
 
 TF_LITE_MICRO_TESTS_END

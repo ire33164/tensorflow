@@ -22,12 +22,18 @@ limitations under the License.
 #include "tensorflow/lite/micro/testing/micro_test.h"
 #include "tensorflow/lite/schema/schema_generated.h"
 #include "tensorflow/lite/version.h"
+#include "tensorflow/lite/simulate_nvm.h"
 
 TF_LITE_MICRO_TESTS_BEGIN
 
 TF_LITE_MICRO_TEST(TestInvoke) {
   // Set up logging.
   tflite::MicroErrorReporter micro_error_reporter;
+
+  create_mmap();
+  // Register signal and signal handler
+  signal(SIGINT, my_handler);
+
 
   // Map the model into a usable data structure. This doesn't involve any
   // copying or parsing, it's a very lightweight operation.
@@ -108,7 +114,14 @@ TF_LITE_MICRO_TEST(TestInvoke) {
   TF_LITE_MICRO_EXPECT_GT(yes_score, silence_score);
   TF_LITE_MICRO_EXPECT_GT(yes_score, unknown_score);
   TF_LITE_MICRO_EXPECT_GT(yes_score, no_score);
+  printf("score: %d %d %d %d\n", silence_score, unknown_score, yes_score, no_score);
+  if (silence_score == 0 && unknown_score == 0 && yes_score == 255 && no_score == 0) {
+    printf("------------------- Congratulations! ---------------------\n");
+  } else {
+    printf("------------------- You are pathetic ---------------------\n");
+  }
 
+  /*
   // Now test with a different input, from a recording of "No".
   const int8_t* no_features_data = g_no_micro_f9643d42_nohash_4_data;
   for (size_t i = 0; i < input->bytes; ++i) {
@@ -138,8 +151,16 @@ TF_LITE_MICRO_TEST(TestInvoke) {
   TF_LITE_MICRO_EXPECT_GT(no_score, silence_score);
   TF_LITE_MICRO_EXPECT_GT(no_score, unknown_score);
   TF_LITE_MICRO_EXPECT_GT(no_score, yes_score);
-
+  printf("score: %d %d %d %d\n", silence_score, unknown_score, yes_score, no_score);
+  if (silence_score == 0 && unknown_score == 14 && yes_score == 0 && no_score == 242) {
+    printf("------------------- Congratulations! ---------------------\n");
+  } else {
+    printf("------------------- You are pathetic ---------------------\n");
+  }
+  */
   TF_LITE_REPORT_ERROR(&micro_error_reporter, "Ran successfully\n");
+  // Erase nvm.bin
+  my_erase();
 }
 
 TF_LITE_MICRO_TESTS_END

@@ -112,7 +112,7 @@ TfLiteStatus EvalQuantizedInt8(TfLiteContext* context, TfLiteNode* node,
                                const TfLiteEvalTensor* filter,
                                const TfLiteEvalTensor* bias,
                                TfLiteEvalTensor* output) {
-  printf("Intermittent Version \n");
+  printf("Intermittent Version\n");
   tflite::FullyConnectedParams op_params;
   op_params.input_offset = -data.input_zero_point;
   op_params.weights_offset = -data.filter_zero_point;
