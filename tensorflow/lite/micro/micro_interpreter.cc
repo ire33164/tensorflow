@@ -339,11 +339,6 @@ TfLiteStatus MicroInterpreter::Invoke() {
   for (size_t i = 0; i < subgraph_->operators()->size(); ++i) {
     if (is_power_failure) {
       i = intermittent_params[offset_nvm].node_idx;
-      /*
-      printf("node idx: %ld\n", intermittent_params[offset_nvm].node_idx);
-      printf("OFM_cnt : %d\n", intermittent_params[offset_nvm].OFM_cnt);
-      printf("version : %d\n", intermittent_params[offset_nvm].version);
-      */
     }
     auto* node = &(node_and_registrations_[i].node);
     auto* registration = node_and_registrations_[i].registration;
@@ -358,10 +353,10 @@ TfLiteStatus MicroInterpreter::Invoke() {
       ScopedOperatorProfile scoped_profiler(
           profiler, OpNameFromRegistration(registration), i);
 #endif
-      printf("----------------------- NODE IDX  %ld ------------------------\n", i);
+      printf("---------------------- NODE IDX  %ld ----------------------\n", i);
       // write_to_nvm(&i, NODE_IDX + offset_nvm * OFFSET, sizeof(i));
       intermittent_params[offset_nvm].node_idx = i;
-      // list_nvm();
+      list_nvm();
       invoke_status = registration->invoke(&context_, node);
 
       // All TfLiteTensor structs used in the kernel are allocated from temp

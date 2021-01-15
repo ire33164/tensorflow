@@ -4,6 +4,7 @@ uint8_t *nvm;
 uint32_t version = 0;
 bool offset_nvm;
 bool is_power_failure;
+bool is_recovery_mode;
 TfLiteIntermittentParams intermittent_params[2];
 
 void my_handler(int signum) {
@@ -33,22 +34,31 @@ void create_mmap() {
   if (nvm == MAP_FAILED) {
     perror("mmap() fail.");
   }
-  read_from_nvm(&intermittent_params[0], 0, sizeof(TfLiteIntermittentParams));
-  read_from_nvm(&intermittent_params[1], OFFSET, sizeof(TfLiteIntermittentParams));
-  /*
-  uint32_t version1, version2;
-  read_from_nvm(&version1, VERSION, sizeof(version1));
-  read_from_nvm(&version2, VERSION + OFFSET, sizeof(version2));
-  */
-  is_power_failure = intermittent_params[0].version != 0;
-  offset_nvm = intermittent_params[0].version >= intermittent_params[1].version ? 0 : 1;
+  read_from_nvm(&is_recovery_mode, RECOVERY, sizeof(is_recovery_mode));
   close(nvm_fd);
 }
 
+void init_nvm() {
+  /* resetting nvm */
+  my_erase();
+  is_recovery_mode = 1;
+  write_to_nvm(&is_recovery_mode, RECOVERY, sizeof(is_recovery_mode));
+}
+
+void set_params () {
+  read_from_nvm(&intermittent_params[0], 0, sizeof(TfLiteIntermittentParams));
+  read_from_nvm(&intermittent_params[1], OFFSET, sizeof(TfLiteIntermittentParams));
+
+  is_power_failure = intermittent_params[0].version != 0;
+  offset_nvm = intermittent_params[0].version >= intermittent_params[1].version ? 0 : 1;
+}
+
+void run_finish() {
+  is_recovery_mode = 0;
+  write_to_nvm(&is_recovery_mode, RECOVERY, sizeof(is_recovery_mode));
+}
+
 void my_memcpy(void *dest, const void *src, size_t len) {
-  printf("Copying\n");
-  printf("Copying\n");
-  printf("Copying\n");
   printf("Copying\n");
   uint8_t *dest_u = reinterpret_cast<uint8_t *>(dest);
   const uint8_t *src_u = reinterpret_cast<const uint8_t *>(src);
@@ -78,4 +88,6 @@ void list_nvm() {
     printf("OFM_cnt   : %d\n", intermittent_params[i].OFM_cnt);
     printf("version : %d\n", intermittent_params[i].version);
   }
+  read_from_nvm(&is_recovery_mode, RECOVERY, sizeof(is_recovery_mode));
+  printf("is_recovery_mode: %d\n", is_recovery_mode);
 }

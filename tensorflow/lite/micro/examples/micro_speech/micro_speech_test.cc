@@ -31,6 +31,8 @@ TF_LITE_MICRO_TEST(TestInvoke) {
   tflite::MicroErrorReporter micro_error_reporter;
 
   create_mmap();
+  if (!is_recovery_mode) init_nvm();
+  set_params();
   // Register signal and signal handler
   signal(SIGINT, my_handler);
 
@@ -160,7 +162,7 @@ TF_LITE_MICRO_TEST(TestInvoke) {
   */
   TF_LITE_REPORT_ERROR(&micro_error_reporter, "Ran successfully\n");
   // Erase nvm.bin
-  my_erase();
+  run_finish();
 }
 
 TF_LITE_MICRO_TESTS_END

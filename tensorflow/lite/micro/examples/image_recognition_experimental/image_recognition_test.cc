@@ -34,6 +34,8 @@ TF_LITE_MICRO_TEST(TestImageRecognitionInvoke) {
   tflite::MicroErrorReporter micro_error_reporter;
 
   create_mmap();
+  if (!is_recovery_mode) init_nvm();
+  set_params();
   // Register signal and signal handler
   signal(SIGINT, my_handler);
 
@@ -99,7 +101,8 @@ TF_LITE_MICRO_TEST(TestImageRecognitionInvoke) {
       num_correct++;
     }
     */
-    my_erase();
+    run_finish();
+    // my_erase();
     // TF_LITE_MICRO_EXPECT_EQ(6, num_correct);
 }
 

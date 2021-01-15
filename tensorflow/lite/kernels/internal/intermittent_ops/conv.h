@@ -164,12 +164,6 @@ inline void Conv(const ConvParams& params, const RuntimeShape& input_shape,
     tmp_out_y =(OFM_cnt - tmp_batch * (output_height * output_width * output_depth)) / (output_width * output_depth) ;
     tmp_out_x = (OFM_cnt - tmp_batch * (output_height * output_width * output_depth) - tmp_out_y * (output_width * output_depth)) / output_depth;
     tmp_out_channel = OFM_cnt - tmp_batch * (output_height * output_width * output_depth) - tmp_out_y * (output_width * output_depth) - tmp_out_x * output_depth;
-    /*
-    printf("Calculate\n");
-    printf("batch: %d\nout_y: %d\nout_x: %d\nout_channel: %d\n", tmp_batch, tmp_out_y, tmp_out_x, tmp_out_channel);
-    printf("Correct\n");
-    printf("batch: %d\nout_y: %d\nout_x: %d\nout_channel: %d\n", intermittent_params[offset_nvm].batch, intermittent_params[offset_nvm].out_y, intermittent_params[offset_nvm].out_x, intermittent_params[offset_nvm].out_channel);
-    */
   }
 
   size_t node_idx;
@@ -235,26 +229,14 @@ inline void Conv(const ConvParams& params, const RuntimeShape& input_shape,
           intermittent_params[offset_nvm].node_idx = node_idx;
           intermittent_params[offset_nvm].input_version = input_version;
           intermittent_params[offset_nvm].OFM_cnt = batch * output_height * output_width * output_depth + out_y * output_width * output_depth + out_x * output_depth + out_channel;
-          /*
-          intermittent_params[offset_nvm].batch = batch;
-          intermittent_params[offset_nvm].out_y = out_y;
-          intermittent_params[offset_nvm].out_x = out_x;
-          intermittent_params[offset_nvm].out_channel = out_channel;
-          */
           intermittent_params[offset_nvm].version = version;
           write_to_nvm(&intermittent_params[offset_nvm], offset_nvm ? OFFSET : 0, sizeof(TfLiteIntermittentParams));
-          // printf("version %d\n", version);
           ++version;
           offset_nvm = !offset_nvm;
         }
       }
     }
   }
-  /*
-  printf("-----------------------------------------\n");
-  list_nvm();
-  printf("-----------------------------------------\n");
-  */
 }
 
 inline void HybridConvPerChannel(
