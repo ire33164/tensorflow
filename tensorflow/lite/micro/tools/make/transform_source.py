@@ -15,7 +15,7 @@
 # ==============================================================================
 """Resolves non-system C/C++ includes to their full paths.
 
-Used to generate Arduino and ESP-IDF examples.
+Used to generate Arduino, ESP-IDF and MSP-CCS examples.
 """
 
 from __future__ import absolute_import
@@ -105,6 +105,21 @@ def replace_esp_example_includes(line, source_path):
     line = '#include "%s"' % rel_to_target
   return line
 
+def replace_msp_example_includes(line, source_path):
+  """Updates any includes for local example files."""
+  # Because the export process moves the example source and header files out of
+  # their default locations into the top-level 'main' folder in the ESP-IDF
+  # project, we have to update any include references to match.
+  include_match = re.match(r'.*#include.*"(' + EXAMPLE_DIR_PATH + r'.*)"', line)
+
+  if include_match:
+    # Compute the target path relative from the source's directory
+    target_path = include_match.group(1)
+    source_dirname = os.path.dirname(source_path)
+    rel_to_target = os.path.relpath(target_path, start=source_dirname)
+
+    line = '#include "%s"' % rel_to_target
+  return line
 
 def transform_arduino_sources(input_lines, flags):
   """Transform sources for the Arduino platform.
@@ -154,6 +169,24 @@ def transform_esp_sources(input_lines, flags):
   output_text = '\n'.join(output_lines)
   return output_text
 
+def transform_msp_sources(input_lines, flags):
+  """Transform sources for the MSP-CCS platform.
+
+  Args:
+    input_lines: A sequence of lines from the input file to process.
+    flags: Flags indicating which transformation(s) to apply.
+
+  Returns:
+    The transformed output as a string.
+  """
+  output_lines = []
+  for line in input_lines:
+    if flags.is_example_source:
+      line = replace_esp_example_includes(line, flags.source_path)
+    output_lines.append(line)
+
+  output_text = '\n'.join(output_lines)
+  return output_text
 
 def main(unused_args, flags):
   """Transforms the input source file to work when exported as example."""
@@ -164,6 +197,8 @@ def main(unused_args, flags):
     output_text = transform_arduino_sources(input_file_lines, flags)
   elif flags.platform == 'esp':
     output_text = transform_esp_sources(input_file_lines, flags)
+  elif flags.platform == 'msp':
+    output_text = transform_msp_sources(input_file_lines, flags)
 
   sys.stdout.write(output_text)
 
@@ -173,7 +208,7 @@ def parse_args():
   parser = argparse.ArgumentParser()
   parser.add_argument(
       '--platform',
-      choices=['arduino', 'esp'],
+      choices=['arduino', 'esp', 'msp'],
       required=True,
       help='Target platform.')
   parser.add_argument(

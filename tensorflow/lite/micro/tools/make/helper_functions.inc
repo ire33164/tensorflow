@@ -430,6 +430,67 @@ $(addprefix $(PRJDIR)$(2)/esp-idf/,$(1))
 ALL_PROJECT_TARGETS += generate_$(2)_esp_project
 endef
 
+# Creates a set of rules to build a standalone MSP-CCS project for an
+# executable, including all of the source and header files required in a
+# separate folder.
+# Arguments are:
+# 1 - Project file template names.
+# 2 - Name of executable.
+# 3 - List of C/C++ source files needed to build the TF Micro component.
+# 4 - List of C/C++ header files needed to build the TF Micro component.
+# 5 - List of C/C++ source files needed to build this particular project.
+# 6 - List of C/C++ header files needed to build this particular project.
+# 7 - Linker flags required.
+# 8 - C++ compilation flags needed.
+# 9 - C compilation flags needed.
+# 10 - List of includes.
+define generate_msp_project
+$(PRJDIR)$(2)/msp-ccs/LICENSE: LICENSE
+	@mkdir -p $$(dir $$@)
+	@cp $$< $$@
+
+$(PRJDIR)$(2)/msp-ccs/%: tensorflow/lite/micro/examples/$(2)/msp/%
+	@mkdir -p $$(dir $$@)
+	@cp $$< $$@
+
+(PRJDIR)$(2)/msp-ccs/main/%.cc: tensorflow/lite/micro/examples/$(2)/%.cc
+	@mkdir -p $$(dir $$@)
+	@python tensorflow/lite/micro/tools/make/transform_source.py \
+        --platform=msp \
+        --is_example_source \
+        --source_path="$$<" \
+        < $$< > $$@
+
+$(PRJDIR)$(2)/msp-ccs/main/%.h: tensorflow/lite/micro/examples/$(2)/%.h
+	@mkdir -p $$(dir $$@)
+	@python tensorflow/lite/micro/tools/make/transform_source.py \
+        --platform=msp \
+        --is_example_source \
+        --source_path="$$<" \
+        < $$< > $$@
+
+$(PRJDIR)$(2)/msp-ccs/main/%: tensorflow/lite/micro/examples/$(2)/%
+	@mkdir -p $$(dir $$@)
+	@cp $$< $$@
+
+$(PRJDIR)$(2)/msp-ccs/%: % third_party_downloads
+	@mkdir -p $$(dir $$@)
+	@cp $$< $$@
+
+$(PRJDIR)$(2)/msp-ccs/third_party/%: tensorflow/lite/micro/tools/make/downloads/% third_party_downloads
+	@mkdir -p $$(dir $$@)
+	@cp $$< $$@
+
+generate_$(2)_msp_project: \
+$(addprefix $(PRJDIR)$(2)/msp-ccs/,\
+$(patsubst tensorflow/%,tensorflow/%,\
+$(patsubst third_party/%,third_party/%,\
+$(patsubst tensorflow/lite/micro/examples/$(2)/%,main/%,$(3) $(4) $(5) $(6))))) \
+$(addprefix $(PRJDIR)$(2)/msp-ccs/,$(1))
+
+ALL_PROJECT_TARGETS += generate_$(2)_msp_project
+endef
+
 # Specialized version of generate_project for TF Lite Micro test targets that
 # automatically includes standard library files, so you just need to pass the
 # test name and any extra source files required.
@@ -449,6 +510,7 @@ ifeq (,$(findstring _benchmark,$(1)))
   $(call generate_arduino_project,$(ARDUINO_PROJECT_FILES) $($(1)_ARDUINO_PROJECT_FILES),$(1),$(MICROLITE_CC_SRCS) $(THIRD_PARTY_CC_SRCS) $(2),$(MICROLITE_CC_HDRS) $(THIRD_PARTY_CC_HDRS) $(MICROLITE_TEST_HDRS) $(3),$(MICROLITE_LIBS),$(CXXFLAGS),$(CCFLAGS))
 endif
 $(call generate_esp_project,$(ESP_PROJECT_FILES) $($(1)_ESP_PROJECT_FILES),$(1),$(MICROLITE_CC_SRCS) $(THIRD_PARTY_CC_SRCS),$(MICROLITE_CC_HDRS) $(THIRD_PARTY_CC_HDRS) $(MICROLITE_TEST_HDRS),$(2),$(3),$(MICROLITE_LIBS),$(CXXFLAGS),$(CCFLAGS),$(PROJECT_INCLUDES))
+$(call generate_msp_project,$(MSP_PROJECT_FILES) $($(1)_MSP_PROJECT_FILES),$(1),$(MICROLITE_CC_SRCS) $(THIRD_PARTY_CC_SRCS),$(MICROLITE_CC_HDRS) $(THIRD_PARTY_CC_HDRS) $(MICROLITE_TEST_HDRS),$(2),$(3),$(MICROLITE_LIBS),$(CXXFLAGS),$(CCFLAGS),$(PROJECT_INCLUDES))
 endef
 
 # Handles the details of generating a binary target, including specializing

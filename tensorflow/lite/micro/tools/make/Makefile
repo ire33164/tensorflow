@@ -382,6 +382,8 @@ ESP_PROJECT_FILES := \
   main/CMakeLists.txt \
   components/tfmicro/CMakeLists.txt
 
+MSP_PROJECT_FILES :=
+
 ALL_PROJECT_TARGETS :=
 
 ARDUINO_LIBRARY_TARGETS :=
