@@ -46,8 +46,8 @@ void init_nvm() {
 }
 
 void set_params () {
-  read_from_nvm(&intermittent_params[0], 0, sizeof(TfLiteIntermittentParams));
-  read_from_nvm(&intermittent_params[1], OFFSET, sizeof(TfLiteIntermittentParams));
+  read_from_nvm(&intermittent_params[0], OFFSET1, sizeof(TfLiteIntermittentParams));
+  read_from_nvm(&intermittent_params[1], OFFSET2, sizeof(TfLiteIntermittentParams));
 
   is_power_failure = intermittent_params[0].version != 0;
   offset_nvm = intermittent_params[0].version >= intermittent_params[1].version ? 0 : 1;
@@ -71,8 +71,20 @@ void read_from_nvm(void *vm_buffer, uint32_t nvm_offset, size_t len) {
   my_memcpy(vm_buffer, nvm + nvm_offset, len);
 }
 
+void read_from_nvm_segmented(void *vm_buffer, uint32_t nvm_offset, uint16_t total_len, uint16_t segment_size) {
+    for (uint16_t idx = 0; idx < total_len; idx += segment_size) {
+        read_from_nvm((uint8_t *)vm_buffer + idx, nvm_offset + idx, MIN_VAL(total_len - idx, segment_size));
+    }
+}
+
 void write_to_nvm(const void *vm_buffer, uint32_t nvm_offset, size_t len) {
   my_memcpy(nvm + nvm_offset, vm_buffer, len);
+}
+
+void write_to_nvm_segmented(const void *vm_buffer, uint32_t nvm_offset, uint16_t total_len, uint16_t segment_size) {
+    for (uint16_t idx = 0; idx < total_len; idx += segment_size) {
+        write_to_nvm((uint8_t *)vm_buffer + idx, nvm_offset + idx, MIN_VAL(total_len - idx, segment_size));
+    }
 }
 
 void my_erase() {
@@ -80,14 +92,9 @@ void my_erase() {
 }
 
 void list_nvm() {
-  // read_from_nvm(&intermittent_params[0], 0, sizeof(TfLiteIntermittentParams));
-  // read_from_nvm(&intermittent_params[1], OFFSET, sizeof(TfLiteIntermittentParams));
-  // printf("size %ld\n", sizeof(TfLiteIntermittentParams));
   for (int i = 0; i < 2; ++i) {
     printf("node idx: %ld\n", intermittent_params[i].node_idx);
     printf("OFM_cnt   : %d\n", intermittent_params[i].OFM_cnt);
     printf("version : %d\n", intermittent_params[i].version);
   }
-  read_from_nvm(&is_recovery_mode, RECOVERY, sizeof(is_recovery_mode));
-  printf("is_recovery_mode: %d\n", is_recovery_mode);
 }

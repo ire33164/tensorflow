@@ -333,9 +333,6 @@ TfLiteStatus MicroInterpreter::Invoke() {
   if (!tensors_allocated_) {
     TF_LITE_ENSURE_OK(&context_, AllocateTensors());
   }
-  // size_t nvm_node_idx;
-  // read_from_nvm(&nvm_node_idx, NODE_IDX + offset_nvm * OFFSET, sizeof(nvm_node_idx));
-  // if (nvm_node_idx >= subgraph_->operators()->size()) read_from_nvm(&nvm_node_idx, NODE_IDX + !offset_nvm * OFFSET, sizeof(nvm_node_idx));
   for (size_t i = 0; i < subgraph_->operators()->size(); ++i) {
     if (is_power_failure) {
       i = intermittent_params[offset_nvm].node_idx;
@@ -353,7 +350,7 @@ TfLiteStatus MicroInterpreter::Invoke() {
       ScopedOperatorProfile scoped_profiler(
           profiler, OpNameFromRegistration(registration), i);
 #endif
-      printf("---------------------- NODE IDX  %ld ----------------------\n", i);
+      printf("--------------------- NODE IDX  %ld ----------------------\n", i);
       // write_to_nvm(&i, NODE_IDX + offset_nvm * OFFSET, sizeof(i));
       intermittent_params[offset_nvm].node_idx = i;
       list_nvm();

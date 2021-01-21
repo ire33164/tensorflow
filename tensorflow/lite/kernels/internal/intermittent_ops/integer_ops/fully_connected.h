@@ -53,11 +53,11 @@ inline void FullyConnected(
   if (!is_power_failure) {
     // Backing up entire input data to NVM in order to avoid lose input data.
     intermittent_params[offset_nvm].input_version = !intermittent_params[offset_nvm].input_version;
-    write_to_nvm(const_cast<int8_t *>(input_data), intermittent_params[offset_nvm].input_version ? NODE_INPUT2 : NODE_INPUT1, input_length);
+    write_to_nvm_segmented(const_cast<int8_t *>(input_data), intermittent_params[offset_nvm].input_version ? NODE_INPUT2 : NODE_INPUT1, input_length, MAX_ACCESS_LENGTH);
   } else {
     // Recover the node's input and output in VM.
-    read_from_nvm(const_cast<int8_t *>(input_data), intermittent_params[offset_nvm].input_version ? NODE_INPUT2 : NODE_INPUT1, input_length);
-    read_from_nvm(reinterpret_cast<void *>(output_data), offset_nvm ? NODE_OUTPUT2 : NODE_OUTPUT1, output_length);
+    read_from_nvm_segmented(const_cast<int8_t *>(input_data), intermittent_params[offset_nvm].input_version ? NODE_INPUT2 : NODE_INPUT1, input_length, MAX_ACCESS_LENGTH);
+    read_from_nvm_segmented(reinterpret_cast<void *>(output_data), offset_nvm ? NODE_OUTPUT2 : NODE_OUTPUT1, output_length, MAX_ACCESS_LENGTH);
     int OFM_cnt = intermittent_params[offset_nvm].OFM_cnt;
     tmp_batch = OFM_cnt / output_depth;
     tmp_channel = OFM_cnt - tmp_batch * output_depth;
@@ -93,13 +93,13 @@ inline void FullyConnected(
       acc = std::min(acc, output_activation_max);
       output_data[out_c + output_depth * b] = static_cast<int8_t>(acc);
       // for intermittent
-      write_to_nvm(reinterpret_cast<void *>(output_data), offset_nvm ? NODE_OUTPUT2 : NODE_OUTPUT1, output_length);
+      write_to_nvm_segmented(reinterpret_cast<void *>(output_data), offset_nvm ? NODE_OUTPUT2 : NODE_OUTPUT1, output_length, MAX_ACCESS_LENGTH);
       // Checkpoint forward progress infomation
       intermittent_params[offset_nvm].node_idx = node_idx;
       intermittent_params[offset_nvm].input_version = input_version;
       intermittent_params[offset_nvm].OFM_cnt = b * output_depth + out_c;
       intermittent_params[offset_nvm].version = version;
-      write_to_nvm(&intermittent_params[offset_nvm], offset_nvm ? OFFSET : 0, sizeof(TfLiteIntermittentParams));
+      write_to_nvm(&intermittent_params[offset_nvm], offset_nvm ? OFFSET2 : OFFSET1, sizeof(TfLiteIntermittentParams));
       ++version;
       offset_nvm = !offset_nvm;
     }
